@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>δ_Σマッピング デモ — rank-k スペクトル近似ポートフォリオ</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2e;
+    --panel2: #1d2438;
+    --border: #2b3350;
+    --text: #e8ecf7;
+    --muted: #9aa4c0;
+    --accent: #4f8ef7;
+    --accent2: #35c98f;
+    --warn: #f2b134;
+    --danger: #f2555a;
+    --tk: #f2b134;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: linear-gradient(180deg, #0b0f18 0%, #0f1420 100%);
+    color: var(--text);
+    font-family: "Hiragino Sans", "Yu Gothic", "Segoe UI", -apple-system, sans-serif;
+  }
+  .wrap {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px 24px 40px;
+  }
+  header h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+    letter-spacing: 0.02em;
+  }
+  header .subtitle {
+    color: var(--muted);
+    font-size: 13.5px;
+    margin: 0 0 18px;
+    line-height: 1.6;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 18px;
+  }
+  .tabgroup { display: flex; flex-direction: column; gap: 6px; }
+  .tabgroup .label { font-size: 11.5px; color: var(--muted); letter-spacing: 0.05em; }
+  .tabs { display: flex; gap: 6px; }
+  .tab {
+    padding: 7px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel2);
+    color: var(--text);
+    font-size: 13.5px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  .tab:hover { border-color: var(--accent); }
+  .tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .slider-block { flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 6px; }
+  .slider-row { display: flex; align-items: center; gap: 12px; }
+  .slider-row input[type=range] {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 6px;
+  }
+  .delta-readout {
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 108px;
+    text-align: right;
+  }
+  .zero-btn {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel2);
+    color: var(--muted);
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  .zero-btn:hover { color: var(--text); border-color: var(--accent); }
+  .stat-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    min-width: 150px;
+  }
+  .stat .k { color: var(--muted); font-size: 11px; letter-spacing: 0.06em; }
+  .stat .v { font-size: 20px; font-weight: 700; margin-top: 2px; }
+  .stat.match .v { color: var(--accent2); }
+  .stat.nomatch .v { color: var(--danger); }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px 10px;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  .card h2 {
+    font-size: 13.5px;
+    margin: 0 0 2px;
+    color: var(--text);
+  }
+  .card .desc {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin: 0 0 6px;
+    line-height: 1.5;
+  }
+  canvas { width: 100%; display: block; }
+  .legend {
+    display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 11px; color: var(--muted); margin-top: 4px;
+  }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .banner {
+    margin-top: 4px; font-size: 12px; padding: 6px 10px; border-radius: 8px;
+    background: rgba(242,177,52,0.12); color: var(--warn); border: 1px solid rgba(242,177,52,0.35);
+  }
+  .banner.ok { background: rgba(53,201,143,0.12); color: var(--accent2); border-color: rgba(53,201,143,0.35); }
+  footer { margin-top: 24px; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
+  code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>δ<sub>Σ</sub> マッピング・インタラクティブデモ</h1>
+    <p class="subtitle">
+      理論的上界 <b>B(k) = T̄(k) + δ<sub>Σ</sub> · C̄(k)</b> を最小化する rank <b>k̂ = argmin<sub>k</sub> B(k)</b> が、
+      walk-forward 実証で最良だった <b>wf_best_k</b> とどの δ<sub>Σ</sub> で一致するかを、その場で δ<sub>Σ</sub> を動かして確認できます。
+      （データは <code>analysis_results.json</code> の walk-forward 集計値そのまま、再計算なし）
+    </p>
+  </header>
+
+  <div class="controls">
+    <div class="tabgroup">
+      <div class="label">共分散モデル</div>
+      <div class="tabs" id="modelTabs"></div>
+    </div>
+    <div class="tabgroup">
+      <div class="label">データセット</div>
+      <div class="tabs" id="datasetTabs"></div>
+    </div>
+    <div class="slider-block">
+      <div class="label">δ<sub>Σ</sub>（推定誤差の大きさ）</div>
+      <div class="slider-row">
+        <button class="zero-btn" id="zeroBtn">δ=0</button>
+        <input type="range" id="deltaSlider" min="-8" max="1" step="0.01" value="-1">
+        <div class="delta-readout" id="deltaReadout">δ=0.1</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat"><div class="k">wf_best_k（実証最良）</div><div class="v" id="statWfK">-</div></div>
+    <div class="stat"><div class="k">theoretical_k（現在のδ）</div><div class="v" id="statThK">-</div></div>
+    <div class="stat" id="statMatch"><div class="k">一致判定</div><div class="v" id="statMatchV">-</div></div>
+    <div class="stat"><div class="k">delta_range（一致区間）</div><div class="v" id="statRange" style="font-size:14px;">-</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card wide">
+      <h2>(a) δ<sub>Σ</sub> vs theoretical_k — 階段関数</h2>
+      <p class="desc">x軸は symlog（0近傍のみ線形、|δ|≥10⁻⁸で対数）。青の階段が理論選択k(δ)、緑の破線が wf_best_k、緑帯が一致区間、縦の橙線が現在のδ位置。</p>
+      <canvas id="stepChart" height="220"></canvas>
+      <div class="legend">
+        <span><span class="sw" style="background:#4f8ef7"></span>theoretical_k(δ)</span>
+        <span><span class="sw" style="background:#35c98f"></span>wf_best_k</span>
+        <span><span class="sw" style="background:rgba(53,201,143,0.35)"></span>一致区間 delta_range</span>
+        <span><span class="sw" style="background:#f2b134"></span>現在のδ</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>(b) 現在のδでの B(k) = T(k) + δ·C(k)</h2>
+      <p class="desc">各kのB(k)を棒グラフで比較。最小のkを橙で強調（= theoretical_k）。緑は wf_best_k。<b>k=0*（灰色）は逆分散ベースラインの参照棒で、本研究の理論選択の候補には含めない。</b></p>
+      <canvas id="barChart" height="230"></canvas>
+    </div>
+
+    <div class="card">
+      <h2>(c) T(k)・C(k) の推移</h2>
+      <p class="desc">打切り誤差 T(k)（灰・左軸）とウェイト集中度 C(k)（紫・右軸）。両者が同時に小さくなるkがあると、B(k)は非負のδではそのkに到達できない。</p>
+      <canvas id="tcChart" height="230"></canvas>
+      <div class="legend">
+        <span><span class="sw" style="background:#9aa4c0"></span>T(k) 打切り誤差（左軸）</span>
+        <span><span class="sw" style="background:#c084fc"></span>C(k) ウェイト集中度（右軸）</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="bannerBox"></div>
+
+  <footer>
+    JAFEE 2026 発表デモ「スペクトル分解に基づくネットワークベースポートフォリオ」補助アプリ。
+    データソース: <code>今回の研究/analysis_results.json</code>（CCC / DCC / ADCC × df1 / df2 の walk-forward 集計値、107リバランス平均）。
+    T(k)・C(k) は各リバランスの推定共分散上で計算した打切り誤差／ウェイト二乗和の平均。ネットワーク接続不要、オフライン動作。
+  </footer>
+</div>
+
+<script>
+const DATA = {"CCC":{"df1":{"wf_best_k":5,"ex_post_best_k":5,"n_rebalances":107,"ref_table":[{"dataset":"df1","model":"CCC","label":"k=0 (inverse-variance baseline)","k":0,"mean_wf_ann_vol":0.07337352785395236,"is_wf_best_k":false},{"dataset":"df1","model":"CCC","label":"k=1 (rank-1 centrality)","k":1,"mean_wf_ann_vol":0.059919972513305504,"is_wf_best_k":false},{"dataset":"df1","model":"CCC","label":"k=5 (walk-forward best)","k":5,"mean_wf_ann_vol":0.05953263620257021,"is_wf_best_k":true},{"dataset":"df1","model":"CCC","label":"k=n (GMVP full rank)","k":7,"mean_wf_ann_vol":0.060080357929951436,"is_wf_best_k":false}],"win_table":[{"dataset":"df1","model":"CCC","k1":1,"wf_best_k":5,"period":"all","n_rebalances":107,"wf_best_k_beats_k1_share":0.7102803738317757,"wf_best_k_beats_k1_pct":"71.0%","k1_mean_ann_vol":0.05640354601704361,"wf_best_k_mean_ann_vol":0.05501095047932849},{"dataset":"df1","model":"CCC","k1":1,"wf_best_k":5,"period":"stress","n_rebalances":5,"wf_best_k_beats_k1_share":0.4,"wf_best_k_beats_k1_pct":"40.0%","k1_mean_ann_vol":0.10432875308311415,"wf_best_k_mean_ann_vol":0.11486570753106007},{"dataset":"df1","model":"CCC","k1":1,"wf_best_k":5,"period":"non_stress","n_rebalances":102,"wf_best_k_beats_k1_share":0.7254901960784313,"wf_best_k_beats_k1_pct":"72.5%","k1_mean_ann_vol":0.05405427116086367,"wf_best_k_mean_ann_vol":0.052076893761106365}],"delta_range":null,"wf_match_found":false,"theoretical_k_at_wf_range":null,"theoretical_k_at_delta_max":6,"summary_k":{"0":{"T":6.701037044207974e-06,"C":0.440393177023066,"mean_realized_ann_vol":0.07337352785395236},"1":{"T":1.695453434424241e-06,"C":0.500062962534387,"mean_realized_ann_vol":0.059919972513305504},"2":{"T":1.6307151924964955e-06,"C":0.4963518527185853,"mean_realized_ann_vol":0.05989455090496387},"3":{"T":1.6965092511992465e-06,"C":0.4864141755799434,"mean_realized_ann_vol":0.06054129157082958},"4":{"T":9.484949058147112e-07,"C":0.40409206725131,"mean_realized_ann_vol":0.06034805424419867},"5":{"T":3.4732522629039415e-07,"C":0.3832776606106508,"mean_realized_ann_vol":0.05953263620257021},"6":{"T":1.675057425375699e-07,"C":0.3769897800371191,"mean_realized_ann_vol":0.059937333674780914},"7":{"T":0.0,"C":0.3939658791126537,"mean_realized_ann_vol":0.060080357929951436}}},"df2":{"wf_best_k":5,"ex_post_best_k":5,"n_rebalances":107,"ref_table":[{"dataset":"df2","model":"CCC","label":"k=0 (inverse-variance baseline)","k":0,"mean_wf_ann_vol":0.1748369818325219,"is_wf_best_k":false},{"dataset":"df2","model":"CCC","label":"k=1 (rank-1 centrality)","k":1,"mean_wf_ann_vol":0.1611571820356066,"is_wf_best_k":false},{"dataset":"df2","model":"CCC","label":"k=5 (walk-forward best)","k":5,"mean_wf_ann_vol":0.16076508663930902,"is_wf_best_k":true},{"dataset":"df2","model":"CCC","label":"k=n (GMVP full rank)","k":200,"mean_wf_ann_vol":0.16909340735887068,"is_wf_best_k":false}],"win_table":[{"dataset":"df2","model":"CCC","k1":1,"wf_best_k":5,"period":"all","n_rebalances":107,"wf_best_k_beats_k1_share":0.6728971962616822,"wf_best_k_beats_k1_pct":"67.3%","k1_mean_ann_vol":0.1229566699728854,"wf_best_k_mean_ann_vol":0.11527205019448931},{"dataset":"df2","model":"CCC","k1":1,"wf_best_k":5,"period":"stress","n_rebalances":5,"wf_best_k_beats_k1_share":0.4,"wf_best_k_beats_k1_pct":"40.0%","k1_mean_ann_vol":0.42094159748518223,"wf_best_k_mean_ann_vol":0.4412052952073915},{"dataset":"df2","model":"CCC","k1":1,"wf_best_k":5,"period":"non_stress","n_rebalances":102,"wf_best_k_beats_k1_share":0.6862745098039216,"wf_best_k_beats_k1_pct":"68.6%","k1_mean_ann_vol":0.10834956568306693,"wf_best_k_mean_ann_vol":0.09929493034091572}],"delta_range":null,"wf_match_found":false,"theoretical_k_at_wf_range":null,"theoretical_k_at_delta_max":50,"summary_k":{"0":{"T":4.317773780774242e-05,"C":0.007127258333431403,"mean_realized_ann_vol":0.1748369818325219},"1":{"T":1.6710660918116396e-05,"C":0.06104679249283047,"mean_realized_ann_vol":0.1611571820356066},"2":{"T":5.220317928628012e-06,"C":0.06322341061330472,"mean_realized_ann_vol":0.16546499857277294},"3":{"T":2.07214679626947e-06,"C":0.06451823560250973,"mean_realized_ann_vol":0.163553858315961},"4":{"T":1.5296403069014817e-06,"C":0.06453563277791073,"mean_realized_ann_vol":0.1621418342080675},"5":{"T":1.2850050720388205e-06,"C":0.06453575563116638,"mean_realized_ann_vol":0.16076508663930902},"6":{"T":1.1317963491705318e-06,"C":0.0644997506411434,"mean_realized_ann_vol":0.16141676284575043},"7":{"T":1.024534079427836e-06,"C":0.06368271199619957,"mean_realized_ann_vol":0.16102340856311403},"8":{"T":9.608840803833894e-07,"C":0.06329192309458538,"mean_realized_ann_vol":0.16099216123666205},"9":{"T":9.243128943352749e-07,"C":0.06275366026680833,"mean_realized_ann_vol":0.16146225435604636},"10":{"T":8.903909253246226e-07,"C":0.06241563705114543,"mean_realized_ann_vol":0.1614074007483315},"20":{"T":8.056310718257102e-07,"C":0.060060709660450635,"mean_realized_ann_vol":0.1620917974014101},"50":{"T":7.856914459630043e-07,"C":0.059169440587737605,"mean_realized_ann_vol":0.161914908805737},"100":{"T":5.599453815251354e-07,"C":0.06490575297516359,"mean_realized_ann_vol":0.16235792259663115},"200":{"T":0.0,"C":0.09327917721496458,"mean_realized_ann_vol":0.16909340735887068}}}},"DCC":{"df1":{"wf_best_k":5,"ex_post_best_k":5,"n_rebalances":107,"ref_table":[{"dataset":"df1","model":"DCC","label":"k=0 (inverse-variance baseline)","k":0,"mean_wf_ann_vol":0.07337352785395235,"is_wf_best_k":false},{"dataset":"df1","model":"DCC","label":"k=1 (rank-1 centrality)","k":1,"mean_wf_ann_vol":0.06030689246068869,"is_wf_best_k":false},{"dataset":"df1","model":"DCC","label":"k=5 (walk-forward best)","k":5,"mean_wf_ann_vol":0.059951211818022015,"is_wf_best_k":true},{"dataset":"df1","model":"DCC","label":"k=n (GMVP full rank)","k":7,"mean_wf_ann_vol":0.06065277692322722,"is_wf_best_k":false}],"win_table":[{"dataset":"df1","model":"DCC","k1":1,"wf_best_k":5,"period":"all","n_rebalances":107,"wf_best_k_beats_k1_share":0.7102803738317757,"wf_best_k_beats_k1_pct":"71.0%","k1_mean_ann_vol":0.056562621052470334,"wf_best_k_mean_ann_vol":0.055048554608470565},{"dataset":"df1","model":"DCC","k1":1,"wf_best_k":5,"period":"stress","n_rebalances":5,"wf_best_k_beats_k1_share":0.4,"wf_best_k_beats_k1_pct":"40.0%","k1_mean_ann_vol":0.10690293709730862,"wf_best_k_mean_ann_vol":0.11686023304590495},{"dataset":"df1","model":"DCC","k1":1,"wf_best_k":5,"period":"non_stress","n_rebalances":102,"wf_best_k_beats_k1_share":0.7254901960784313,"wf_best_k_beats_k1_pct":"72.5%","k1_mean_ann_vol":0.054094958501252774,"wf_best_k_mean_ann_vol":0.05201857037134144}],"delta_range":null,"wf_match_found":false,"theoretical_k_at_wf_range":null,"theoretical_k_at_delta_max":6,"summary_k":{"0":{"T":7.158281681364659e-06,"C":0.440393177023066,"mean_realized_ann_vol":0.07337352785395235},"1":{"T":2.0943203275275276e-06,"C":0.4977542601981054,"mean_realized_ann_vol":0.06030689246068869},"2":{"T":1.9541358583157022e-06,"C":0.49453206749554823,"mean_realized_ann_vol":0.06026216320908155},"3":{"T":1.9742113081111735e-06,"C":0.48782267403316465,"mean_realized_ann_vol":0.06061837930371571},"4":{"T":1.1617469125861533e-06,"C":0.4200477600831595,"mean_realized_ann_vol":0.0612355706004455},"5":{"T":5.04956560258583e-07,"C":0.38506090631958073,"mean_realized_ann_vol":0.059951211818022015},"6":{"T":1.9429163180139504e-07,"C":0.3757672727365876,"mean_realized_ann_vol":0.0606057675045702},"7":{"T":0.0,"C":0.3904744154623808,"mean_realized_ann_vol":0.06065277692322722}}},"df2":{"wf_best_k":1,"ex_post_best_k":1,"n_rebalances":107,"ref_table":[{"dataset":"df2","model":"DCC","label":"k=0 (inverse-variance baseline)","k":0,"mean_wf_ann_vol":0.1748369818325219,"is_wf_best_k":false},{"dataset":"df2","model":"DCC","label":"k=1 (rank-1 centrality)","k":1,"mean_wf_ann_vol":0.1692915566626183,"is_wf_best_k":true},{"dataset":"df2","model":"DCC","label":"k=n (GMVP full rank)","k":200,"mean_wf_ann_vol":0.17365780542875164,"is_wf_best_k":false}],"win_table":[{"dataset":"df2","model":"DCC","k1":1,"wf_best_k":1,"period":"all","n_rebalances":107,"wf_best_k_beats_k1_share":null,"wf_best_k_beats_k1_pct":"NaN","k1_mean_ann_vol":0.12305428476480539,"wf_best_k_mean_ann_vol":null,"notes":"wf_best_k=1; win rate undefined"}],"delta_range":[0.010858419285959044,10.0],"wf_match_found":true,"theoretical_k_at_wf_range":1,"theoretical_k_at_delta_max":1,"summary_k":{"0":{"T":5.1704945403157505e-05,"C":0.007127258333431403,"mean_realized_ann_vol":0.1748369818325219},"1":{"T":1.814327603213124e-05,"C":0.05055636149352805,"mean_realized_ann_vol":0.1692915566626183},"2":{"T":8.154593186493015e-06,"C":0.05538881888082572,"mean_realized_ann_vol":0.17341146715312894},"3":{"T":4.909273469565912e-06,"C":0.055990676119737584,"mean_realized_ann_vol":0.1700891731673424},"4":{"T":3.669309047499369e-06,"C":0.0558417676936884,"mean_realized_ann_vol":0.17074779531011547},"5":{"T":2.7400270699232353e-06,"C":0.055562271133394264,"mean_realized_ann_vol":0.16997918414992538},"6":{"T":2.385573880815945e-06,"C":0.05527026712159892,"mean_realized_ann_vol":0.17168696874207712},"7":{"T":2.1019123550556714e-06,"C":0.05507596279330138,"mean_realized_ann_vol":0.17177325784356556},"8":{"T":1.8794193538221964e-06,"C":0.05494278637942307,"mean_realized_ann_vol":0.17170934864060713},"9":{"T":1.7102710697598145e-06,"C":0.054669949244194584,"mean_realized_ann_vol":0.17125015759898204},"10":{"T":1.5901427782545272e-06,"C":0.05486685501015817,"mean_realized_ann_vol":0.17040556810846322},"20":{"T":1.3687213749595398e-06,"C":0.052101204643843935,"mean_realized_ann_vol":0.17044072655529202},"50":{"T":1.2476582297845555e-06,"C":0.05331429561005087,"mean_realized_ann_vol":0.17118145080066968},"100":{"T":8.085169602702512e-07,"C":0.060635172354176224,"mean_realized_ann_vol":0.1708007253267751},"200":{"T":0.0,"C":0.08177145655405176,"mean_realized_ann_vol":0.17365780542875164}}}},"ADCC":{"df1":{"wf_best_k":7,"ex_post_best_k":7,"n_rebalances":107,"ref_table":[{"dataset":"df1","model":"ADCC","label":"k=0 (inverse-variance baseline)","k":0,"mean_wf_ann_vol":0.07337352785395235,"is_wf_best_k":false},{"dataset":"df1","model":"ADCC","label":"k=1 (rank-1 centrality)","k":1,"mean_wf_ann_vol":0.060215004150772855,"is_wf_best_k":false},{"dataset":"df1","model":"ADCC","label":"k=n (GMVP full rank)","k":7,"mean_wf_ann_vol":0.06008638524687835,"is_wf_best_k":true}],"win_table":[{"dataset":"df1","model":"ADCC","k1":1,"wf_best_k":7,"period":"all","n_rebalances":107,"wf_best_k_beats_k1_share":0.6728971962616822,"wf_best_k_beats_k1_pct":"67.3%","k1_mean_ann_vol":0.05650864711064238,"wf_best_k_mean_ann_vol":0.055855881488630306},{"dataset":"df1","model":"ADCC","k1":1,"wf_best_k":7,"period":"stress","n_rebalances":5,"wf_best_k_beats_k1_share":0.8,"wf_best_k_beats_k1_pct":"80.0%","k1_mean_ann_vol":0.10663381368517286,"wf_best_k_mean_ann_vol":0.11041762419109442},{"dataset":"df1","model":"ADCC","k1":1,"wf_best_k":7,"period":"non_stress","n_rebalances":102,"wf_best_k_beats_k1_share":0.6666666666666666,"wf_best_k_beats_k1_pct":"66.7%","k1_mean_ann_vol":0.05405153110208697,"wf_best_k_mean_ann_vol":0.05318128625811736}],"delta_range":[0.0,3.594715955472293e-05],"wf_match_found":true,"theoretical_k_at_wf_range":7,"theoretical_k_at_delta_max":6,"summary_k":{"0":{"T":5.37207492424011e-06,"C":0.440393177023066,"mean_realized_ann_vol":0.07337352785395235},"1":{"T":1.2894332774340635e-06,"C":0.5005217651436364,"mean_realized_ann_vol":0.060215004150772855},"2":{"T":9.636577431198445e-07,"C":0.5153795069211734,"mean_realized_ann_vol":0.0603857939183942},"3":{"T":9.572026061425851e-07,"C":0.5277923174599346,"mean_realized_ann_vol":0.060626537161562966},"4":{"T":7.465363087788057e-07,"C":0.5139689403387633,"mean_realized_ann_vol":0.06114170243543907},"5":{"T":3.0320614894340246e-07,"C":0.49758217391546045,"mean_realized_ann_vol":0.06019802315436238},"6":{"T":1.498332617963207e-07,"C":0.48640567061201934,"mean_realized_ann_vol":0.06016863506711349},"7":{"T":0.0,"C":0.49057381946770195,"mean_realized_ann_vol":0.06008638524687835}}},"df2":{"wf_best_k":8,"ex_post_best_k":8,"n_rebalances":107,"ref_table":[{"dataset":"df2","model":"ADCC","label":"k=0 (inverse-variance baseline)","k":0,"mean_wf_ann_vol":0.1748369889858677,"is_wf_best_k":false},{"dataset":"df2","model":"ADCC","label":"k=1 (rank-1 centrality)","k":1,"mean_wf_ann_vol":0.17128057819699136,"is_wf_best_k":false},{"dataset":"df2","model":"ADCC","label":"k=8 (walk-forward best)","k":8,"mean_wf_ann_vol":0.1707619914926636,"is_wf_best_k":true},{"dataset":"df2","model":"ADCC","label":"k=n (GMVP full rank)","k":200,"mean_wf_ann_vol":0.17468197482830036,"is_wf_best_k":false}],"win_table":[{"dataset":"df2","model":"ADCC","k1":1,"wf_best_k":8,"period":"all","n_rebalances":107,"wf_best_k_beats_k1_share":0.6448598130841121,"wf_best_k_beats_k1_pct":"64.5%","k1_mean_ann_vol":0.1239697708064695,"wf_best_k_mean_ann_vol":0.1182322025815562},{"dataset":"df2","model":"ADCC","k1":1,"wf_best_k":8,"period":"stress","n_rebalances":5,"wf_best_k_beats_k1_share":0.4,"wf_best_k_beats_k1_pct":"40.0%","k1_mean_ann_vol":0.45099990951239544,"wf_best_k_mean_ann_vol":0.46476489521037995},{"dataset":"df2","model":"ADCC","k1":1,"wf_best_k":8,"period":"non_stress","n_rebalances":102,"wf_best_k_beats_k1_share":0.6568627450980392,"wf_best_k_beats_k1_pct":"65.7%","k1_mean_ann_vol":0.10793888165421822,"wf_best_k_mean_ann_vol":0.10124530588406482}],"delta_range":null,"wf_match_found":false,"theoretical_k_at_wf_range":null,"theoretical_k_at_delta_max":20,"summary_k":{"0":{"T":4.807121147671583e-05,"C":0.007127253955770245,"mean_realized_ann_vol":0.1748369889858677},"1":{"T":1.3850918386678429e-05,"C":0.058112869534641114,"mean_realized_ann_vol":0.17128057819699136},"2":{"T":5.878640554573701e-06,"C":0.06003470907683326,"mean_realized_ann_vol":0.1728714409856123},"3":{"T":3.474137122298812e-06,"C":0.06145853174755427,"mean_realized_ann_vol":0.17196761902322927},"4":{"T":2.469330375333588e-06,"C":0.06106087388959709,"mean_realized_ann_vol":0.1713230110696902},"5":{"T":1.7684719104811362e-06,"C":0.06084163601844533,"mean_realized_ann_vol":0.17166785775877832},"6":{"T":1.5122093341565593e-06,"C":0.060454231441617455,"mean_realized_ann_vol":0.1718096103258475},"7":{"T":1.2954413898110673e-06,"C":0.0601206163553334,"mean_realized_ann_vol":0.17189026005229024},"8":{"T":1.1403143129933856e-06,"C":0.059992378086164214,"mean_realized_ann_vol":0.1707619914926636},"9":{"T":1.0319547156431364e-06,"C":0.059851357561599476,"mean_realized_ann_vol":0.17146009384010624},"10":{"T":9.500843340852476e-07,"C":0.059363414120785524,"mean_realized_ann_vol":0.1714456272788758},"20":{"T":8.195366228233015e-07,"C":0.05711867450540611,"mean_realized_ann_vol":0.17135990616658106},"50":{"T":7.216473495029411e-07,"C":0.058451884535854856,"mean_realized_ann_vol":0.17194224997478794},"100":{"T":4.267484740439466e-07,"C":0.06541991456905019,"mean_realized_ann_vol":0.17218072965687337},"200":{"T":0.0,"C":0.08376443195229606,"mean_realized_ann_vol":0.17468197482830036}}}}};
+
+const MODELS = ['CCC', 'DCC', 'ADCC'];
+const DATASETS = [
+  { key: 'df1', label: 'df1（7資産）' },
+  { key: 'df2', label: 'df2（200銘柄）' },
+];
+
+let state = { model: 'CCC', dataset: 'df1', logDelta: -1 };
+
+function currentEntry() {
+  return DATA[state.model][state.dataset];
+}
+
+// 理論選択の下限 k。本研究の B(k) 理論選択では k=0（逆分散ベースライン）を
+// 候補から除外する（mgarch_rankk_common.py の運用と同じ扱い）。
+// k=0 自体はグラフ上に参照線として表示する。
+const THEORY_K_MIN = 1;
+
+function kValues(entry) {
+  return Object.keys(entry.summary_k).map(Number).sort((a, b) => a - b);
+}
+
+function theoryKValues(entry) {
+  return kValues(entry).filter(k => k >= THEORY_K_MIN);
+}
+
+function computeB(entry, k, delta) {
+  const e = entry.summary_k[String(k)];
+  return e.T + delta * e.C;
+}
+
+function theoreticalK(entry, delta) {
+  const ks = theoryKValues(entry);
+  let bestK = ks[0], bestB = Infinity;
+  for (const k of ks) {
+    const b = computeB(entry, k, delta);
+    if (b < bestB - 1e-18) { bestB = b; bestK = k; }
+  }
+  return bestK;
+}
+
+// symlog mapping: linear near 0 (|x| < linthresh), log10 beyond.
+const LINTHRESH = 1e-9;
+function symlogForward(x) {
+  const ax = Math.abs(x);
+  if (ax <= LINTHRESH) return x / LINTHRESH; // maps [-linthresh, linthresh] -> [-1, 1]
+  const sign = x < 0 ? -1 : 1;
+  return sign * (1 + Math.log10(ax / LINTHRESH));
+}
+
+function buildDeltaGrid(deltaMin, deltaMax, n) {
+  const grid = [0.0];
+  const lo = Math.log10(deltaMin), hi = Math.log10(deltaMax);
+  for (let i = 0; i < n; i++) {
+    const t = lo + (hi - lo) * (i / (n - 1));
+    grid.push(Math.pow(10, t));
+  }
+  return grid.sort((a, b) => a - b);
+}
+
+function fmtSci(x, digits = 3) {
+  if (x === 0) return '0';
+  return x.toExponential(digits);
+}
+function fmtDelta(x) {
+  if (x === 0) return '0';
+  if (x >= 0.001 && x < 100000) return x.toPrecision(3);
+  return x.toExponential(2);
+}
+
+// ---------- Canvas helpers ----------
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const w = rect.width || canvas.clientWidth || 600;
+  const h = parseInt(canvas.getAttribute('height'), 10) || 220;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+function drawAxes(ctx, w, h, pad) {
+  ctx.strokeStyle = '#2b3350';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, h - pad.b);
+  ctx.lineTo(w - pad.r, h - pad.b);
+  ctx.stroke();
+}
+
+// ---------- Chart (a): step plot delta -> theoretical_k ----------
+function drawStepChart(entry) {
+  const canvas = document.getElementById('stepChart');
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  const pad = { l: 46, r: 20, t: 14, b: 30 };
+  drawAxes(ctx, w, h, pad);
+
+  const deltaMin = 1e-8, deltaMax = 10.0;
+  const grid = buildDeltaGrid(deltaMin, deltaMax, 400);
+  const ks = theoryKValues(entry);
+  const kMin = ks[0], kMax = ks[ks.length - 1];
+
+  const xMinLog = symlogForward(deltaMin);
+  const xMaxLog = symlogForward(deltaMax);
+  function xPix(delta) {
+    const s = symlogForward(delta);
+    const t = (s - xMinLog) / (xMaxLog - xMinLog);
+    return pad.l + t * (w - pad.l - pad.r);
+  }
+  function yPix(k) {
+    const t = (k - kMin) / (kMax - kMin || 1);
+    return (h - pad.b) - t * (h - pad.b - pad.t);
+  }
+
+  // matched delta_range shading
+  if (entry.delta_range) {
+    const [lo, hi] = entry.delta_range;
+    const x0 = xPix(Math.max(lo, deltaMin));
+    const x1 = xPix(Math.min(hi, deltaMax));
+    ctx.fillStyle = 'rgba(53,201,143,0.22)';
+    ctx.fillRect(x0, pad.t, Math.max(x1 - x0, 1), h - pad.t - pad.b);
+  }
+
+  // wf_best_k horizontal dashed line
+  ctx.strokeStyle = '#35c98f';
+  ctx.setLineDash([6, 4]);
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  const yWf = yPix(entry.wf_best_k);
+  ctx.moveTo(pad.l, yWf);
+  ctx.lineTo(w - pad.r, yWf);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // step curve
+  ctx.strokeStyle = '#4f8ef7';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  let prevY = null;
+  for (let i = 0; i < grid.length; i++) {
+    const d = grid[i];
+    const k = theoreticalK(entry, d);
+    const x = xPix(d);
+    const y = yPix(k);
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, prevY);
+      ctx.lineTo(x, y);
+    }
+    prevY = y;
+  }
+  ctx.lineTo(xPix(deltaMax), prevY);
+  ctx.stroke();
+
+  // current delta vertical line
+  const curDelta = Math.pow(10, state.logDelta);
+  const xCur = xPix(curDelta);
+  ctx.strokeStyle = '#f2b134';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(xCur, pad.t);
+  ctx.lineTo(xCur, h - pad.b);
+  ctx.stroke();
+
+  // y axis ticks (integers)
+  ctx.fillStyle = '#9aa4c0';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  const yTickCount = Math.min(ks.length, 8);
+  const step = Math.max(1, Math.round((kMax - kMin) / yTickCount));
+  for (let k = kMin; k <= kMax; k += step) {
+    const y = yPix(k);
+    ctx.fillText(String(k), pad.l - 6, y);
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+  }
+  ctx.fillText(String(kMax), pad.l - 6, yPix(kMax));
+
+  // x axis ticks
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const xticks = [1e-8, 1e-6, 1e-4, 1e-2, 1, 10];
+  for (const xt of xticks) {
+    const x = xPix(xt);
+    ctx.fillText(xt >= 1 ? String(xt) : xt.toExponential(0), x, h - pad.b + 5);
+  }
+  ctx.textAlign = 'left';
+  ctx.fillText('δ_Σ', w - pad.r - 12, h - pad.b + 16);
+}
+
+// ---------- Chart (b): B(k) bar chart at current delta ----------
+function drawBarChart(entry) {
+  const canvas = document.getElementById('barChart');
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  const pad = { l: 54, r: 16, t: 14, b: 34 };
+  drawAxes(ctx, w, h, pad);
+
+  const delta = Math.pow(10, state.logDelta);
+  const ks = kValues(entry);
+  const bVals = ks.map(k => computeB(entry, k, delta));
+  const bMax = Math.max(...bVals) * 1.12 || 1;
+  const thK = theoreticalK(entry, delta);
+
+  const bw = (w - pad.l - pad.r) / ks.length;
+  ctx.font = '10px sans-serif';
+  ks.forEach((k, i) => {
+    const val = bVals[i];
+    const bh = (val / bMax) * (h - pad.t - pad.b);
+    const x = pad.l + i * bw + bw * 0.15;
+    const bwidth = bw * 0.7;
+    const y = (h - pad.b) - bh;
+    const isBest = k === thK;
+    const isExcluded = k < THEORY_K_MIN;
+    if (isExcluded) {
+      ctx.fillStyle = '#4a5170';
+    } else {
+      ctx.fillStyle = isBest ? '#f2b134' : (k === entry.wf_best_k ? '#35c98f' : '#4f8ef7aa');
+    }
+    ctx.fillRect(x, y, bwidth, bh);
+    ctx.fillStyle = isExcluded ? '#6b7391' : '#9aa4c0';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('k=' + k + (isExcluded ? '*' : ''), pad.l + i * bw + bw / 2, h - pad.b + 5);
+  });
+
+  // y-axis label ticks
+  ctx.fillStyle = '#9aa4c0';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let f = 0; f <= 4; f++) {
+    const v = (bMax / 4) * f;
+    const y = (h - pad.b) - (v / bMax) * (h - pad.t - pad.b);
+    ctx.fillText(fmtSci(v, 1), pad.l - 6, y);
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+  }
+}
+
+// ---------- Chart (c): T(k) and C(k) lines ----------
+function drawTCChart(entry) {
+  const canvas = document.getElementById('tcChart');
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  const pad = { l: 54, r: 54, t: 14, b: 30 };
+  drawAxes(ctx, w, h, pad);
+
+  const ks = kValues(entry);
+  const tVals = ks.map(k => entry.summary_k[String(k)].T);
+  const cVals = ks.map(k => entry.summary_k[String(k)].C);
+  const tMax = Math.max(...tVals) * 1.1 || 1;
+  const cMax = Math.max(...cVals) * 1.1 || 1;
+  const cMin = Math.min(...cVals) * 0.95;
+
+  function xPix(i) {
+    return pad.l + (i / (ks.length - 1 || 1)) * (w - pad.l - pad.r);
+  }
+  function yPixT(v) {
+    return (h - pad.b) - (v / tMax) * (h - pad.t - pad.b);
+  }
+  function yPixC(v) {
+    return (h - pad.b) - ((v - cMin) / (cMax - cMin || 1)) * (h - pad.t - pad.b);
+  }
+
+  // T(k) line - gray
+  ctx.strokeStyle = '#9aa4c0';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ks.forEach((k, i) => {
+    const x = xPix(i), y = yPixT(tVals[i]);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // C(k) line - purple
+  ctx.strokeStyle = '#c084fc';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ks.forEach((k, i) => {
+    const x = xPix(i), y = yPixC(cVals[i]);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // markers + highlight wf_best_k / theoretical_k
+  const delta = Math.pow(10, state.logDelta);
+  const thK = theoreticalK(entry, delta);
+  ks.forEach((k, i) => {
+    const x = xPix(i);
+    ctx.fillStyle = '#9aa4c0';
+    ctx.beginPath(); ctx.arc(x, yPixT(tVals[i]), 2.6, 0, 7); ctx.fill();
+    ctx.fillStyle = '#c084fc';
+    ctx.beginPath(); ctx.arc(x, yPixC(cVals[i]), 2.6, 0, 7); ctx.fill();
+    if (k === entry.wf_best_k || k === thK) {
+      ctx.strokeStyle = k === thK ? '#f2b134' : '#35c98f';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(x, pad.t); ctx.lineTo(x, h - pad.b);
+      ctx.stroke();
+    }
+  });
+
+  // x labels
+  ctx.fillStyle = '#9aa4c0';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ks.forEach((k, i) => {
+    ctx.fillText(String(k), xPix(i), h - pad.b + 5);
+  });
+
+  // axis labels
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let f = 0; f <= 3; f++) {
+    const v = (tMax / 3) * f;
+    ctx.fillStyle = '#9aa4c0';
+    ctx.fillText(fmtSci(v, 1), pad.l - 6, yPixT(v));
+  }
+  ctx.textAlign = 'left';
+  for (let f = 0; f <= 3; f++) {
+    const v = cMin + ((cMax - cMin) / 3) * f;
+    ctx.fillStyle = '#c084fc';
+    ctx.fillText(v.toFixed(2), w - pad.r + 6, yPixC(v));
+  }
+}
+
+function updateStats(entry) {
+  const delta = Math.pow(10, state.logDelta);
+  const thK = theoreticalK(entry, delta);
+  document.getElementById('statWfK').textContent = 'k = ' + entry.wf_best_k;
+  document.getElementById('statThK').textContent = 'k = ' + thK;
+  const matchEl = document.getElementById('statMatch');
+  const matchV = document.getElementById('statMatchV');
+  if (thK === entry.wf_best_k) {
+    matchEl.className = 'stat match';
+    matchV.textContent = '一致 ✓';
+  } else {
+    matchEl.className = 'stat nomatch';
+    matchV.textContent = '不一致';
+  }
+  const rangeEl = document.getElementById('statRange');
+  if (entry.delta_range) {
+    rangeEl.textContent = '[' + fmtDelta(entry.delta_range[0]) + ', ' + fmtDelta(entry.delta_range[1]) + ']';
+  } else {
+    rangeEl.textContent = 'NaN（一致区間なし）';
+  }
+
+  const bannerBox = document.getElementById('bannerBox');
+  if (!entry.delta_range) {
+    bannerBox.innerHTML = '<div class="banner">この組み合わせ（' + state.model + ' / ' + state.dataset +
+      '）では、非負の δ_Σ をどこまで動かしても theoretical_k が wf_best_k=' + entry.wf_best_k +
+      ' に一致する区間は存在しません（NaN）。δ_max=10 時点の theoretical_k は ' +
+      entry.theoretical_k_at_delta_max + ' です。近傍の k で T(k)・C(k) が両方小さくなる k が存在するためです。</div>';
+  } else {
+    bannerBox.innerHTML = '<div class="banner ok">この組み合わせでは δ_Σ ∈ [' + fmtDelta(entry.delta_range[0]) + ', ' +
+      fmtDelta(entry.delta_range[1]) + '] のとき theoretical_k が wf_best_k=' + entry.wf_best_k + ' と一致します。</div>';
+  }
+}
+
+function renderAll() {
+  const entry = currentEntry();
+  const delta = Math.pow(10, state.logDelta);
+  document.getElementById('deltaReadout').textContent = 'δ=' + fmtDelta(delta);
+  drawStepChart(entry);
+  drawBarChart(entry);
+  drawTCChart(entry);
+  updateStats(entry);
+}
+
+function buildTabs() {
+  const modelTabs = document.getElementById('modelTabs');
+  MODELS.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (m === state.model ? ' active' : '');
+    btn.textContent = m;
+    btn.onclick = () => {
+      state.model = m;
+      [...modelTabs.children].forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      renderAll();
+    };
+    modelTabs.appendChild(btn);
+  });
+
+  const datasetTabs = document.getElementById('datasetTabs');
+  DATASETS.forEach(d => {
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (d.key === state.dataset ? ' active' : '');
+    btn.textContent = d.label;
+    btn.onclick = () => {
+      state.dataset = d.key;
+      [...datasetTabs.children].forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      renderAll();
+    };
+    datasetTabs.appendChild(btn);
+  });
+}
+
+document.getElementById('deltaSlider').addEventListener('input', (e) => {
+  state.logDelta = parseFloat(e.target.value);
+  renderAll();
+});
+document.getElementById('zeroBtn').addEventListener('click', () => {
+  state.logDelta = -8;
+  document.getElementById('deltaSlider').value = -8;
+  renderAll();
+});
+
+window.addEventListener('resize', renderAll);
+
+buildTabs();
+renderAll();
+</script>
+</body>
+</html>
