@@ -2,6 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
 <title>δ_Σマッピング デモ — rank-k スペクトル近似ポートフォリオ</title>
 <style>
   :root {
@@ -30,13 +32,13 @@
     padding: 20px 24px 40px;
   }
   header h1 {
-    font-size: 22px;
-    margin: 0 0 4px;
+    font-size: 30px;
+    margin: 0 0 6px;
     letter-spacing: 0.02em;
   }
   header .subtitle {
     color: var(--muted);
-    font-size: 13.5px;
+    font-size: 17px;
     margin: 0 0 18px;
     line-height: 1.6;
   }
@@ -52,15 +54,15 @@
     margin-bottom: 18px;
   }
   .tabgroup { display: flex; flex-direction: column; gap: 6px; }
-  .tabgroup .label { font-size: 11.5px; color: var(--muted); letter-spacing: 0.05em; }
+  .tabgroup .label { font-size: 15px; color: var(--muted); letter-spacing: 0.05em; }
   .tabs { display: flex; gap: 6px; }
   .tab {
-    padding: 7px 16px;
+    padding: 9px 20px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--panel2);
     color: var(--text);
-    font-size: 13.5px;
+    font-size: 17px;
     cursor: pointer;
     transition: all 0.12s ease;
   }
@@ -80,19 +82,19 @@
   }
   .delta-readout {
     font-variant-numeric: tabular-nums;
-    font-size: 15px;
+    font-size: 22px;
     font-weight: 700;
     color: var(--accent);
-    min-width: 108px;
+    min-width: 140px;
     text-align: right;
   }
   .zero-btn {
-    padding: 6px 12px;
+    padding: 8px 14px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--panel2);
     color: var(--muted);
-    font-size: 12.5px;
+    font-size: 15px;
     cursor: pointer;
   }
   .zero-btn:hover { color: var(--text); border-color: var(--accent); }
@@ -108,8 +110,8 @@
     padding: 10px 16px;
     min-width: 150px;
   }
-  .stat .k { color: var(--muted); font-size: 11px; letter-spacing: 0.06em; }
-  .stat .v { font-size: 20px; font-weight: 700; margin-top: 2px; }
+  .stat .k { color: var(--muted); font-size: 14px; letter-spacing: 0.06em; }
+  .stat .v { font-size: 28px; font-weight: 700; margin-top: 2px; }
   .stat.match .v { color: var(--accent2); }
   .stat.nomatch .v { color: var(--danger); }
   .grid {
@@ -126,39 +128,40 @@
   }
   .card.wide { grid-column: 1 / -1; }
   .card h2 {
-    font-size: 13.5px;
-    margin: 0 0 2px;
+    font-size: 19px;
+    margin: 0 0 8px;
     color: var(--text);
-  }
-  .card .desc {
-    font-size: 11.5px;
-    color: var(--muted);
-    margin: 0 0 6px;
-    line-height: 1.5;
   }
   canvas { width: 100%; display: block; }
   .legend {
-    display: flex; gap: 14px; flex-wrap: wrap;
-    font-size: 11px; color: var(--muted); margin-top: 4px;
+    display: flex; gap: 18px; flex-wrap: wrap;
+    font-size: 15px; color: var(--muted); margin-top: 8px;
   }
-  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
   .banner {
-    margin-top: 4px; font-size: 12px; padding: 6px 10px; border-radius: 8px;
+    margin-top: 12px; font-size: 18px; font-weight: 600; padding: 12px 16px; border-radius: 8px;
     background: rgba(242,177,52,0.12); color: var(--warn); border: 1px solid rgba(242,177,52,0.35);
   }
   .banner.ok { background: rgba(53,201,143,0.12); color: var(--accent2); border-color: rgba(53,201,143,0.35); }
-  footer { margin-top: 24px; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
-  code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
+  @media (max-width: 900px) {
+    .wrap { padding: 14px 12px 28px; }
+    header h1 { font-size: 23px; }
+    header .subtitle { font-size: 15px; }
+    .grid { grid-template-columns: 1fr; }
+    .slider-block { min-width: 100%; }
+    .stat { flex: 1 1 40%; min-width: 0; }
+    .stat .v { font-size: 22px; }
+    .banner { font-size: 15px; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <noscript><div class="banner">このデモの表示には JavaScript が必要です。ブラウザの設定で JavaScript を有効にしてください。</div></noscript>
   <header>
     <h1>δ<sub>Σ</sub> マッピング・インタラクティブデモ</h1>
     <p class="subtitle">
-      理論的上界 <b>B(k) = T̄(k) + δ<sub>Σ</sub> · C̄(k)</b> を最小化する rank <b>k̂ = argmin<sub>k</sub> B(k)</b> が、
-      walk-forward 実証で最良だった <b>wf_best_k</b> とどの δ<sub>Σ</sub> で一致するかを、その場で δ<sub>Σ</sub> を動かして確認できます。
-      （データは <code>analysis_results.json</code> の walk-forward 集計値そのまま、再計算なし）
+      理論上界 <b>B(k) = T̄(k) + δ<sub>Σ</sub> · C̄(k)</b> の最小化点と walk-forward 最良 k の一致を確認
     </p>
   </header>
 
@@ -185,14 +188,13 @@
     <div class="stat"><div class="k">wf_best_k（実証最良）</div><div class="v" id="statWfK">-</div></div>
     <div class="stat"><div class="k">theoretical_k（現在のδ）</div><div class="v" id="statThK">-</div></div>
     <div class="stat" id="statMatch"><div class="k">一致判定</div><div class="v" id="statMatchV">-</div></div>
-    <div class="stat"><div class="k">delta_range（一致区間）</div><div class="v" id="statRange" style="font-size:14px;">-</div></div>
+    <div class="stat"><div class="k">delta_range（一致区間）</div><div class="v" id="statRange" style="font-size:19px;">-</div></div>
   </div>
 
   <div class="grid">
     <div class="card wide">
-      <h2>(a) δ<sub>Σ</sub> vs theoretical_k — 階段関数</h2>
-      <p class="desc">x軸は symlog（0近傍のみ線形、|δ|≥10⁻⁸で対数）。青の階段が理論選択k(δ)、緑の破線が wf_best_k、緑帯が一致区間、縦の橙線が現在のδ位置。</p>
-      <canvas id="stepChart" height="220"></canvas>
+      <h2>(a) δ<sub>Σ</sub> vs theoretical_k</h2>
+      <canvas id="stepChart" height="240"></canvas>
       <div class="legend">
         <span><span class="sw" style="background:#4f8ef7"></span>theoretical_k(δ)</span>
         <span><span class="sw" style="background:#35c98f"></span>wf_best_k</span>
@@ -202,15 +204,18 @@
     </div>
 
     <div class="card">
-      <h2>(b) 現在のδでの B(k) = T(k) + δ·C(k)</h2>
-      <p class="desc">各kのB(k)を棒グラフで比較。最小のkを橙で強調（= theoretical_k）。緑は wf_best_k。<b>k=0*（灰色）は逆分散ベースラインの参照棒で、本研究の理論選択の候補には含めない。</b></p>
-      <canvas id="barChart" height="230"></canvas>
+      <h2>(b) B(k) = T(k) + δ·C(k)</h2>
+      <canvas id="barChart" height="250"></canvas>
+      <div class="legend">
+        <span><span class="sw" style="background:#f2b134"></span>theoretical_k</span>
+        <span><span class="sw" style="background:#35c98f"></span>wf_best_k</span>
+        <span><span class="sw" style="background:#4a5170"></span>k=0* 参照（候補外）</span>
+      </div>
     </div>
 
     <div class="card">
       <h2>(c) T(k)・C(k) の推移</h2>
-      <p class="desc">打切り誤差 T(k)（灰・左軸）とウェイト集中度 C(k)（紫・右軸）。両者が同時に小さくなるkがあると、B(k)は非負のδではそのkに到達できない。</p>
-      <canvas id="tcChart" height="230"></canvas>
+      <canvas id="tcChart" height="250"></canvas>
       <div class="legend">
         <span><span class="sw" style="background:#9aa4c0"></span>T(k) 打切り誤差（左軸）</span>
         <span><span class="sw" style="background:#c084fc"></span>C(k) ウェイト集中度（右軸）</span>
@@ -220,11 +225,6 @@
 
   <div id="bannerBox"></div>
 
-  <footer>
-    JAFEE 2026 発表デモ「スペクトル分解に基づくネットワークベースポートフォリオ」補助アプリ。
-    データソース: <code>今回の研究/analysis_results.json</code>（CCC / DCC / ADCC × df1 / df2 の walk-forward 集計値、107リバランス平均）。
-    T(k)・C(k) は各リバランスの推定共分散上で計算した打切り誤差／ウェイト二乗和の平均。ネットワーク接続不要、オフライン動作。
-  </footer>
 </div>
 
 <script>
@@ -328,7 +328,7 @@ function drawStepChart(entry) {
   const canvas = document.getElementById('stepChart');
   const { ctx, w, h } = setupCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
-  const pad = { l: 46, r: 20, t: 14, b: 30 };
+  const pad = { l: 56, r: 20, t: 14, b: 36 };
   drawAxes(ctx, w, h, pad);
 
   const deltaMin = 1e-8, deltaMax = 10.0;
@@ -401,7 +401,7 @@ function drawStepChart(entry) {
 
   // y axis ticks (integers)
   ctx.fillStyle = '#9aa4c0';
-  ctx.font = '10px sans-serif';
+  ctx.font = '14px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   const yTickCount = Math.min(ks.length, 8);
@@ -431,7 +431,7 @@ function drawBarChart(entry) {
   const canvas = document.getElementById('barChart');
   const { ctx, w, h } = setupCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
-  const pad = { l: 54, r: 16, t: 14, b: 34 };
+  const pad = { l: 70, r: 16, t: 14, b: 40 };
   drawAxes(ctx, w, h, pad);
 
   const delta = Math.pow(10, state.logDelta);
@@ -441,7 +441,7 @@ function drawBarChart(entry) {
   const thK = theoreticalK(entry, delta);
 
   const bw = (w - pad.l - pad.r) / ks.length;
-  ctx.font = '10px sans-serif';
+  ctx.font = '14px sans-serif';
   ks.forEach((k, i) => {
     const val = bVals[i];
     const bh = (val / bMax) * (h - pad.t - pad.b);
@@ -480,7 +480,7 @@ function drawTCChart(entry) {
   const canvas = document.getElementById('tcChart');
   const { ctx, w, h } = setupCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
-  const pad = { l: 54, r: 54, t: 14, b: 30 };
+  const pad = { l: 70, r: 62, t: 14, b: 36 };
   drawAxes(ctx, w, h, pad);
 
   const ks = kValues(entry);
@@ -540,7 +540,7 @@ function drawTCChart(entry) {
 
   // x labels
   ctx.fillStyle = '#9aa4c0';
-  ctx.font = '10px sans-serif';
+  ctx.font = '14px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ks.forEach((k, i) => {
@@ -586,13 +586,11 @@ function updateStats(entry) {
 
   const bannerBox = document.getElementById('bannerBox');
   if (!entry.delta_range) {
-    bannerBox.innerHTML = '<div class="banner">この組み合わせ（' + state.model + ' / ' + state.dataset +
-      '）では、非負の δ_Σ をどこまで動かしても theoretical_k が wf_best_k=' + entry.wf_best_k +
-      ' に一致する区間は存在しません（NaN）。δ_max=10 時点の theoretical_k は ' +
-      entry.theoretical_k_at_delta_max + ' です。近傍の k で T(k)・C(k) が両方小さくなる k が存在するためです。</div>';
+    bannerBox.innerHTML = '<div class="banner">' + state.model + ' / ' + state.dataset +
+      '：wf_best_k=' + entry.wf_best_k + ' に一致する δ<sub>Σ</sub> 区間なし</div>';
   } else {
-    bannerBox.innerHTML = '<div class="banner ok">この組み合わせでは δ_Σ ∈ [' + fmtDelta(entry.delta_range[0]) + ', ' +
-      fmtDelta(entry.delta_range[1]) + '] のとき theoretical_k が wf_best_k=' + entry.wf_best_k + ' と一致します。</div>';
+    bannerBox.innerHTML = '<div class="banner ok">δ<sub>Σ</sub> ∈ [' + fmtDelta(entry.delta_range[0]) + ', ' +
+      fmtDelta(entry.delta_range[1]) + '] で wf_best_k=' + entry.wf_best_k + ' と一致</div>';
   }
 }
 
@@ -647,6 +645,9 @@ document.getElementById('zeroBtn').addEventListener('click', () => {
 });
 
 window.addEventListener('resize', renderAll);
+window.addEventListener('orientationchange', renderAll);
+// フォント読み込み・レイアウト確定後に再描画（canvas サイズずれ防止）
+window.addEventListener('load', renderAll);
 
 buildTabs();
 renderAll();
