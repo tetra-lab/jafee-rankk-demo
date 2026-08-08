@@ -302,9 +302,15 @@ function fmtDelta(x) {
 // ---------- Canvas helpers ----------
 function setupCanvas(canvas) {
   const dpr = window.devicePixelRatio || 1;
+  // canvas.height への代入は height 属性自体を書き換えるため、
+  // 初回に設計上の表示高さを dataset に退避し、以降はそれだけを参照する
+  // （dpr>1 の環境で描画のたびに高さが dpr 倍に成長するのを防ぐ）
+  if (!canvas.dataset.baseHeight) {
+    canvas.dataset.baseHeight = canvas.getAttribute('height') || '220';
+  }
+  const h = parseInt(canvas.dataset.baseHeight, 10) || 220;
   const rect = canvas.getBoundingClientRect();
   const w = rect.width || canvas.clientWidth || 600;
-  const h = parseInt(canvas.getAttribute('height'), 10) || 220;
   canvas.width = w * dpr;
   canvas.height = h * dpr;
   canvas.style.height = h + 'px';
